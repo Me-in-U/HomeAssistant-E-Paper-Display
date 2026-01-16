@@ -1,0 +1,6 @@
+# Ignore the secrets header file
+secrets.h
+
+# IDE specific files
+.vscode/
+.idea/
