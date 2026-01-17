@@ -56,7 +56,7 @@ const char* ha_token = "YOUR_LONG_LIVED_ACCESS_TOKEN";
 
 ### 2. Home Assistant 센서 연동
 
-코드는 다음의 Home Assistant 엔티티 ID를 참조하도록 작성되었습니다. 필요시 `eink_elevator.ino` 및 `fetchWeatherInfo` 함수 내의 템플릿을 본인의 환경에 맞게 수정하세요.
+코드는 다음의 Home Assistant 엔티티 ID를 참조하도록 작성되었습니다. 필요시 `elevator_weather.ino` 및 `fetchWeatherInfo` 함수 내의 템플릿을 본인의 환경에 맞게 수정하세요.
 
 - 엘리베이터: `sensor.elevator_0_0_6_floor`
 - 날씨(기온): `sensor.wn_daeweondong_temperature`
@@ -68,7 +68,7 @@ const char* ha_token = "YOUR_LONG_LIVED_ACCESS_TOKEN";
 
 ## 📂 파일 구조
 
-- **eink_elevator.ino**: 메인 로직, WiFi 연결, HA 통신, 화면 갱신 제어.
+- **elevator_weather.ino**: 메인 로직, WiFi 연결, HA 통신, 화면 갱신 제어.
 - **icons.h**: 날씨 아이콘(32x32) 비트맵 데이터 (직접 제작/수정).
 - **fonts.h / font\*.c**: 한글 및 영문 폰트 데이터.
 - **GUI*Paint, EPD*\***: 웨이브쉐어 E-Ink 드라이버 및 그래픽 라이브러리.
@@ -86,6 +86,13 @@ const char* ha_token = "YOUR_LONG_LIVED_ACCESS_TOKEN";
    - 날씨 정보는 **10분** 간격으로 API 조회 및 갱신.
 
 ## 📝 버전 기록 (Version History)
+
+### v1.0.1 (2026-01-17)
+
+- **성능 최적화**: 호출 대기 상태에서 엘리베이터 이동 감지 시 즉시 층수를 표시하도록 개선 (불필요한 전체 리프레시 제거).
+- **코드 정리**: 아두이노 프로젝트 구조 수정 (`elevator_weather.ino`로 변경) 및 불필요한 소스 파일 삭제.
+- **도구 통합**: 폰트 생성 스크립트 기능 통합 (`gen_korean_font.py` - Full/Lite 모드 지원).
+- **버그 수정**: 파일명 대소문자 표기 통일 (`Font20KR.c`).
 
 ### v1.0.0 (2026-01-16)
 

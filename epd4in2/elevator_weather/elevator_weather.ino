@@ -279,7 +279,8 @@ void updateDisplay(String statusText) {
   bool wasWaiting = (lastStatus == "호출대기중");
   bool isSleeping = (statusText == "심야절전중");
   
-  bool fullRefresh = isFirstRun || isMyHomeRefresh || isWaiting || wasWaiting || isSleeping;
+  // wasWaiting 제거: 대기 상태(Sleep)에서 깨어날 때 전체 리프레시(깜빡임)를 하지 않고 바로 부분 갱신
+  bool fullRefresh = isFirstRun || isMyHomeRefresh || isWaiting || isSleeping;
 
   // 1. 디스플레이 드라이버 초기화
   if (fullRefresh) {
@@ -289,6 +290,10 @@ void updateDisplay(String statusText) {
     EPD_4IN2_V2_Init_Fast(Seconds_1S); 
   } else {
     Serial.println("Performing Partial Refresh...");
+    // Sleep 상태였던 경우 깨우기 위해 초기화 필요
+    if (wasWaiting) {
+       EPD_4IN2_V2_Init_Fast(Seconds_1S);
+    }
   }
 
   // 2. 버퍼에 그리기
