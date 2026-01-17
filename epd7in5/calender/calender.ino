@@ -8,23 +8,23 @@
 #include "GUI_Paint.h"
 #include "secrets.h"
 
-// Display resolution
+// 디스플레이 해상도
 #define EPD_WIDTH 800
 #define EPD_HEIGHT 480
 
-// NTP Server
+// NTP 서버 설정
 const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = 9 * 3600; // Korea Standard Time (UTC+9)
+const long  gmtOffset_sec = 9 * 3600; // 한국 표준시 (UTC+9)
 const int   daylightOffset_sec = 0;
 
-// Image buffer
+// 이미지 버퍼
 UBYTE *BlackImage;
 
-// RTC Memory variables (survive Deep Sleep)
+// RTC 메모리 변수 (Deep Sleep 유지)
 RTC_DATA_ATTR uint32_t lastEventHash = 0;
 RTC_DATA_ATTR int lastDay = -1;
 
-// Forward declarations
+// 함수 원형 선언
 void drawCalendar(struct tm *timeinfo, DynamicJsonDocument *doc);
 void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc);
 void drawEventsForDay(int year, int month, int day, int x, int y, int w, int h, DynamicJsonDocument *doc);
@@ -33,10 +33,10 @@ uint32_t computeEventsHash(DynamicJsonDocument *doc);
 void setup() {
   Serial.begin(115200);
   
-  // Initialize GPIOs
+  // GPIO 초기화
   DEV_Module_Init();
 
-  // Connect to WiFi
+  // WiFi 연결
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -44,7 +44,7 @@ void setup() {
   }
   Serial.println(" CONNECTED");
 
-  // Init and get the time
+  // 시간 초기화 및 동기화
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)){
@@ -53,7 +53,7 @@ void setup() {
   }
   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 
-  // Calculate Year/Month for fetching
+  // 데이터 조회를 위한 연/월 계산
   int year = timeinfo.tm_year + 1900;
   int month = timeinfo.tm_mon + 1;
   int daysInMonth;
@@ -66,30 +66,30 @@ void setup() {
     daysInMonth = 31;
   }
 
-  // Fetch Events
+  // 이벤트(일정) 조회
   DynamicJsonDocument *doc = new DynamicJsonDocument(65536);
   fetchEvents(year, month, daysInMonth, doc);
   
-  // Compute Hash
+  // 데이터 해시 계산 (변경 감지용)
   uint32_t currentHash = computeEventsHash(doc);
   Serial.printf("Last Hash: %u, Current Hash: %u\n", lastEventHash, currentHash);
   Serial.printf("Last Day: %d, Current Day: %d\n", lastDay, timeinfo.tm_mday);
 
-  // Check if update is needed
-  // Update if:
-  // 1. It's a new day (midnight update or first run)
-  // 2. Events have changed
+  // 업데이트 필요 여부 확인
+  // 업데이트 조건:
+  // 1. 날짜가 변경되었을 때 (자정 또는 첫 실행)
+  // 2. 이벤트(일정)가 변경되었을 때
   bool needUpdate = (timeinfo.tm_mday != lastDay) || (currentHash != lastEventHash);
 
   if (needUpdate) {
       printf("Update required. Initializing Display...\r\n");
       
-      // Initialize Display
+      // 디스플레이 초기화
       EPD_7IN5_V2_Init();
       EPD_7IN5_V2_Clear();
       DEV_Delay_ms(500);
 
-      // Create a new image cache
+      // 새 이미지 캐시 생성
       UWORD Imagesize = ((EPD_WIDTH % 8 == 0)? (EPD_WIDTH / 8 ): (EPD_WIDTH / 8 + 1)) * EPD_HEIGHT;
       if((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) {
           printf("Failed to apply for black memory...\r\n");
@@ -99,20 +99,20 @@ void setup() {
       Paint_SelectImage(BlackImage);
       Paint_Clear(WHITE);
 
-      // Draw Calendar
+      // 달력 그리기
       drawCalendar(&timeinfo, doc);
 
-      // Display the frame
+      // 화면 출력
       EPD_7IN5_V2_Display(BlackImage);
       DEV_Delay_ms(2000);
 
-      // Sleep Display
+      // 디스플레이 절전
       printf("Goto Sleep...\r\n");
       EPD_7IN5_V2_Sleep();
       free(BlackImage);
       BlackImage = NULL;
 
-      // Update State
+      // 상태 업데이트
       lastEventHash = currentHash;
       lastDay = timeinfo.tm_mday;
   } else {
@@ -121,8 +121,8 @@ void setup() {
 
   delete doc;
 
-  // Deep Sleep until next hour
-  // ESP32 will restart after waking up
+  // 다음 정각까지 Deep Sleep
+  // 깨어난 후 ESP32가 재시작됩니다
   long sleepSeconds = (60 - timeinfo.tm_min) * 60 - timeinfo.tm_sec;
   if (sleepSeconds <= 0) sleepSeconds = 3600; // Safety fallback
 
@@ -140,10 +140,10 @@ void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc)
   if (WiFi.status() != WL_CONNECTED) return;
 
   WiFiClientSecure client;
-  client.setInsecure(); // Skip SSL verification
+  client.setInsecure(); // SSL 검증 건너뛰기
   HTTPClient http;
 
-  // 1. Get List of Calendars
+  // 1. 캘린더 목록 조회
   String listUrl = String(ha_base_url) + "/api/calendars";
   Serial.println("Fetching Calendars List: " + listUrl);
   
@@ -162,7 +162,7 @@ void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc)
   String listPayload = http.getString();
   http.end();
 
-  // Parse List
+  // 목록 파싱
   DynamicJsonDocument listDoc(8192);
   DeserializationError listError = deserializeJson(listDoc, listPayload);
   if (listError) {
@@ -172,9 +172,9 @@ void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc)
   }
   
   JsonArray calendars = listDoc.as<JsonArray>();
-  JsonArray allEvents = doc->to<JsonArray>(); // Initialize main doc as array
+  JsonArray allEvents = doc->to<JsonArray>(); // 메인 문서를 배열로 초기화
 
-  // 2. Iterate and Fetch Events
+  // 2. 각 캘린더별 이벤트 순회 및 조회
   for (JsonObject cal : calendars) {
       const char* entity_id = cal["entity_id"];
       if (!entity_id) continue;
@@ -195,13 +195,13 @@ void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc)
       int eventCode = http.GET();
       if (eventCode == 200) {
           String eventPayload = http.getString();
-          // Use a temporary doc for parsing each calendar's events
+          // 각 캘린더 이벤트 파싱을 위한 임시 문서 사용
           DynamicJsonDocument tempDoc(16384); 
           DeserializationError err = deserializeJson(tempDoc, eventPayload);
           if (!err) {
               JsonArray events = tempDoc.as<JsonArray>();
               for (JsonVariant v : events) {
-                  // Deep copy event to main doc
+                  // 메인 문서로 이벤트 깊은 복사
                   allEvents.add(v);
               }
               Serial.printf("  Found %d events\n", events.size());
@@ -217,7 +217,7 @@ void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc)
   Serial.printf("Total events fetched: %d\n", allEvents.size());
 }
 
-// Helper to convert "YYYY-MM-DD" to long YYYYMMDD
+// "YYYY-MM-DD" 문자열을 정수형 YYYYMMDD로 변환하는 헬퍼 함수
 long getDateValue(String dateStr) {
   if (dateStr.length() < 10) return 0;
   return dateStr.substring(0, 4).toInt() * 10000 + 
@@ -226,7 +226,7 @@ long getDateValue(String dateStr) {
 }
 
 void drawTruncatedString(int x, int y, int w, String text) {
-  // Font12KR: ASCII ~9px (0.75), KR 12px
+  // Font12KR: ASCII 약 9px, 한글 12px
   int asciiW = 9;
   int krW = 12;
   int availableW = w - 5; 
@@ -318,7 +318,7 @@ void drawEventsForDay(int year, int month, int day, int x, int y, int w, int h, 
   
   String birthdaySummary = "";
   
-  // Pass 1: Collect Birthdays
+  // 1단계: 생일 정보 수집
   for (JsonObject event : events) {
     const char* summaryStr = event["summary"];
     String summary = String(summaryStr);
@@ -347,17 +347,17 @@ void drawEventsForDay(int year, int month, int day, int x, int y, int w, int h, 
     }
   }
 
-  // Draw Birthday Line
+  // 생일 라인 그리기
   if (birthdaySummary.length() > 0) {
       eventY = drawWrappedString(x, y, w, h, eventY, "[생일] " + birthdaySummary);
   }
 
-  // Pass 2: Draw Other Events
+  // 2단계: 기타 일정 그리기
   for (JsonObject event : events) {
     const char* summaryStr = event["summary"];
     String summary = String(summaryStr);
     
-    if (summary.endsWith("님의 생일")) continue; // Skip birthdays
+    if (summary.endsWith("님의 생일")) continue; // 생일 제외
 
     String startStr, endStr;
     bool isAllDay = false;
@@ -387,28 +387,28 @@ void drawEventsForDay(int year, int month, int day, int x, int y, int w, int h, 
 void drawCalendar(struct tm *timeinfo, DynamicJsonDocument *doc) {
   int year = timeinfo->tm_year + 1900;
   int month = timeinfo->tm_mon + 1; // 1-12
-  int today = timeinfo->tm_mday; // Today's date
+  int today = timeinfo->tm_mday; // 오늘 날짜
   
-  // Draw Days of Week (Korean)
+  // 요일 표시 (한글)
   const char* days[] = {"일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"};
   int cellWidth = EPD_WIDTH / 7;
-  int headerHeight = 30; // Reduced header height (only for day names)
+  int headerHeight = 30; // 헤더 높이 축소 (요일 표시용)
   
   for (int i = 0; i < 7; i++) {
-    // Center the text
-    // Font20KR width is 20. "일요일" is 3 chars -> 60px width.
+    // 텍스트 중앙 정렬
+    // Font20KR 너비 20. "일요일" 3글자 -> 60px 너비.
     int textWidth = 20 * 3;
     int x = i * cellWidth + (cellWidth - textWidth) / 2;
     Paint_DrawString_CN(x, 5, days[i], &Font20KR, BLACK, WHITE);
   }
 
-  // Calculate first day of month
+  // 해당 월의 첫 번째 날 요일 계산
   struct tm firstDay = *timeinfo;
   firstDay.tm_mday = 1;
   mktime(&firstDay);
-  int startDayOfWeek = firstDay.tm_wday; // 0=Sun, 6=Sat
+  int startDayOfWeek = firstDay.tm_wday; // 0=일요일, 6=토요일
 
-  // Calculate days in month
+  // 해당 월의 총 일수 계산
   int daysInMonth;
   if (month == 2) {
     if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0))
@@ -421,12 +421,12 @@ void drawCalendar(struct tm *timeinfo, DynamicJsonDocument *doc) {
     daysInMonth = 31;
   }
 
-  // Calculate number of weeks needed
-  // (startDayOfWeek + daysInMonth + 6) / 7 gives the number of rows
+  // 필요한 주(Week) 수 계산
+  // (startDayOfWeek + daysInMonth + 6) / 7 로 행 개수 계산
   int numWeeks = (startDayOfWeek + daysInMonth + 6) / 7;
   int cellHeight = (EPD_HEIGHT - headerHeight) / numWeeks;
 
-  // Draw Grid and Days
+  // 그리드 및 날짜 그리기
   int currentDay = 1;
   for (int row = 0; row < numWeeks; row++) {
     for (int col = 0; col < 7; col++) {
@@ -440,30 +440,30 @@ void drawCalendar(struct tm *timeinfo, DynamicJsonDocument *doc) {
       int x = col * cellWidth;
       int y = headerHeight + row * cellHeight;
 
-      // Draw Horizontal Lines (Top and Bottom)
+      // 가로선 그리기 (상단/하단)
       Paint_DrawLine(x, y, x + cellWidth, y, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
       Paint_DrawLine(x, y + cellHeight, x + cellWidth, y + cellHeight, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
 
-      // Draw Vertical Lines
-      // Left border: Skip for Sunday (col 0)
+      // 세로선 그리기
+      // 왼쪽 테두리: 일요일(col 0)은 제외
       if (col > 0) {
         Paint_DrawLine(x, y, x, y + cellHeight, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
       }
-      // Right border: Skip for Saturday (col 6)
+      // 오른쪽 테두리: 토요일(col 6)은 제외
       if (col < 6) {
         Paint_DrawLine(x + cellWidth, y, x + cellWidth, y + cellHeight, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
       }
 
-      // Draw Day Number (Using Korean Font for style)
+      // 날짜 숫자 그리기 (스타일을 위해 한글 폰트 사용)
       char dayStr[4];
       sprintf(dayStr, "%d", currentDay);
       
       if (currentDay == today) {
-        // Highlight Today: Thick Border
+        // 오늘 날짜 강조: 굵은 테두리
         Paint_DrawRectangle(x + 1, y + 1, x + cellWidth - 1, y + cellHeight - 1, BLACK, DOT_PIXEL_2X2, DRAW_FILL_EMPTY);
         
-        // Highlight Today: Inverted Number Background
-        // Font20KR ASCII width is approx 15px. Height is 20px.
+        // 오늘 날짜 강조: 숫자 배경 반전
+        // Font20KR ASCII 너비 약 15px. 높이 20px.
         int numW = (currentDay < 10) ? 15 : 30; 
         Paint_DrawRectangle(x + 3, y + 3, x + 3 + numW, y + 3 + 20, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
         Paint_DrawString_CN(x + 3, y + 3, dayStr, &Font20KR, WHITE, BLACK);
@@ -471,7 +471,7 @@ void drawCalendar(struct tm *timeinfo, DynamicJsonDocument *doc) {
         Paint_DrawString_CN(x + 3, y + 3, dayStr, &Font20KR, BLACK, WHITE);
       }
 
-      // Draw Events for this day
+      // 해당 날짜의 일정 그리기
       drawEventsForDay(year, month, currentDay, x, y, cellWidth, cellHeight, doc);
 
       currentDay++;
@@ -487,7 +487,7 @@ uint32_t computeEventsHash(DynamicJsonDocument *doc) {
     if (summary) {
         for (const char* p = summary; *p; p++) hash = ((hash << 5) + hash) + *p;
     }
-    // Hash start time
+    // 시작 시간 해싱
     const char* start = event["start"]["dateTime"];
     if (!start) start = event["start"]["date"];
     if (start) {
