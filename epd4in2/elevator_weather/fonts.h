@@ -78,23 +78,11 @@ typedef struct
   
 }cFONT;
 
-extern sFONT Font20;
-// extern sFONT Font16;
-// extern sFONT Font12;
-// extern sFONT Font8;
-
-// extern cFONT Font12CN;
-// extern cFONT Font24CN;
-extern cFONT Font12KR;
-extern cFONT Font16KR;
+// Active Fonts
 extern cFONT Font20KR;
 extern cFONT Font64KR;
 
 extern const sFONT Maple20;
-extern const sFONT Maple44;
-extern const sFONT Maple64;
-
-// extern const unsigned char Font16_Table[];
 
 #ifdef __cplusplus
 }
