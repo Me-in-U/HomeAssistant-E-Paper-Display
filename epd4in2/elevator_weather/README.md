@@ -40,6 +40,12 @@
 - **Display**: Waveshare 4.2inch E-Paper Module (V2)
 - **Interface**: SPI
 
+## 3D 모델링
+
+|                     Front                     |                     Back                     |
+| :-------------------------------------------: | :------------------------------------------: |
+| <img src="./img/model_front.png" width="300"> | <img src="./img/model_back.png" width="300"> |
+
 ## ⚙️ 소프트웨어 설정
 
 ### 1. `secrets.h` 파일 생성
