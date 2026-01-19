@@ -1,12 +1,18 @@
 # HomeAssistant E-Paper Display
 
+**[English](#english) | [한국어](#korean-한국어)**
+
+---
+
+## English
+
 This project provides code for driving E-Paper displays using ESP32, based on the Waveshare driver board.
 
-## License
+### License
 
 This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. Please see the [LICENSE](LICENSE) file for the full text.
 
-## Credits & Acknowledgments
+### Credits & Acknowledgments
 
 This project is based on and utilizes code from the **esp32-waveshare-epd** library provided by Waveshare.
 
@@ -15,6 +21,26 @@ This project is based on and utilizes code from the **esp32-waveshare-epd** libr
 - **License File**: [License.txt](E-Paper_ESP32_Driver_Board_Code/examples/esp32-waveshare-epd/extras/License.txt)
 
 Modifications have been made to specific header (`.h`) and source (`.cpp`) files to adapt the library for this project's specific requirements. In accordance with the open-source philosophy and library terms, these modifications are kept open.
+
+---
+
+## Korean (한국어)
+
+이 프로젝트는 Waveshare 드라이버 보드를 기반으로 ESP32를 사용하여 E-Paper 디스플레이를 구동하는 코드를 제공합니다.
+
+### 라이선스 (License)
+
+이 프로젝트는 **GNU General Public License v3.0 (GPLv3)**에 따라 라이선스가 허가됩니다. 전체 내용은 [LICENSE](LICENSE) 파일을 참조해 주세요.
+
+### 크레딧 및 감사의 말 (Credits & Acknowledgments)
+
+이 프로젝트는 Waveshare에서 제공하는 **esp32-waveshare-epd** 라이브러리를 기반으로 하며 이를 활용합니다.
+
+- **출처**: [Waveshare E-Paper ESP32 Driver Board Wiki](https://www.waveshare.com/wiki/E-Paper_ESP32_Driver_Board)
+- **원본 라이선스**: GNU Lesser General Public License (LGPL)
+- **라이선스 파일**: [License.txt](E-Paper_ESP32_Driver_Board_Code/examples/esp32-waveshare-epd/extras/License.txt)
+
+이 프로젝트의 요구 사항에 맞게 특정 헤더 파일(`.h`)과 소스 파일(`.cpp`)이 수정되었습니다. 오픈 소스 철학 및 라이브러리 사용 조건에 따라, 수정된 내용은 모두 공개됩니다.
 
 ### Maplestory Font License
 
