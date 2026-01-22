@@ -290,11 +290,9 @@ void updateDisplay(String statusText) {
     EPD_4IN2_V2_Init_Fast(Seconds_1S); 
   } else {
     Serial.println("Performing Partial Refresh...");
-    // Sleep 상태였던 경우 깨우기 위해 초기화 필요
-    if (wasWaiting) {
-       EPD_4IN2_V2_Init_Fast(Seconds_1S);
-    }
+    // Sleep 상태였던 경우 깨우기 위해 초기화 필요 없음 (Wait 상태에서 Sleep 하지 않도록 변경함)
   }
+
 
   // 2. 버퍼에 그리기
   Paint_NewImage(BlackImage, EPD_WIDTH, EPD_HEIGHT, 0, WHITE);
@@ -441,7 +439,8 @@ void updateDisplay(String statusText) {
   }
   
   // 4. 절전
-  if (isWaiting || isSleeping) {
+  if (isSleeping) {
       EPD_4IN2_V2_Sleep();
   }
+
 }
