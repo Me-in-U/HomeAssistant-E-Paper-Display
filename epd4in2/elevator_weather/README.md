@@ -58,7 +58,28 @@ const char* password = "YOUR_WIFI_PASSWORD";
 
 const char* ha_base_url = "http://YOUR_HA_IP:8123";
 const char* ha_token = "YOUR_LONG_LIVED_ACCESS_TOKEN";
+
+// 선택 사항: Static IP 사용
+// 대부분 환경에서는 아래 2개만 있으면 됩니다.
+#define WIFI_USE_STATIC_IP 1
+#define WIFI_STATIC_IP_ADDR 192, 168, 0, 50
+
+// 아래는 공유기 기본 주소가 192.168.0.1이 아니거나
+// 서브넷/DNS를 직접 바꿔야 할 때만 추가하세요.
+#define WIFI_GATEWAY_ADDR 192, 168, 0, 1
+#define WIFI_SUBNET_MASK 255, 255, 255, 0
+#define WIFI_PRIMARY_DNS_ADDR 192, 168, 0, 1
+#define WIFI_SECONDARY_DNS_ADDR 8, 8, 8, 8
+
+// 선택 사항: 내부망 URL 사용
+// 기본값은 0이며, 1로 바꾸면 아래 주소를 사용합니다.
+#define HA_USE_INTERNAL_BASE_URL 1
+#define HA_INTERNAL_BASE_URL "http://192.168.0.10:8123"
 ```
+
+`WIFI_USE_STATIC_IP`를 정의하지 않거나 `0`으로 두면 DHCP를 사용합니다.
+`HA_USE_INTERNAL_BASE_URL`를 정의하지 않거나 `0`으로 두면 기존 `ha_base_url`을 사용합니다.
+`HA_INTERNAL_BASE_URL`는 `http://...`와 `https://...` 둘 다 사용할 수 있습니다.
 
 ### 2. Home Assistant 센서 연동
 
@@ -87,8 +108,10 @@ const char* ha_token = "YOUR_LONG_LIVED_ACCESS_TOKEN";
    - 엘리베이터 상태 API 조회.
      - 이동 중(층수 변경): **1초** 간격으로 빠른 상태 조회.
      - 대기 중: **3초** 간격으로 조회.
-   - 상태 변경 시 화면 부분 갱신(Partial Refresh).
+   - 상태 변경 시 화면 갱신.
+     - "호출대기중" 진입 시: 1회 전체 갱신 후, 유지 중에는 부분 갱신 위주로 동작.
      - "23층" 도착 시: 즉시 갱신 후, 10초 뒤 잔상 제거를 위한 전체 갱신(Full Refresh) 수행.
+     - 호출 대기 상태가 오래 지속되면 고스팅 방지를 위해 30분마다 전체 갱신 수행.
    - 날씨 정보는 **10분** 간격으로 API 조회 및 갱신.
 
 ## 📝 버전 기록 (Version History)

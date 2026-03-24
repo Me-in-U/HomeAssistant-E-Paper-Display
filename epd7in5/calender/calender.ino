@@ -8,6 +8,38 @@
 #include "GUI_Paint.h"
 #include "secrets.h"
 
+#ifndef WIFI_USE_STATIC_IP
+#define WIFI_USE_STATIC_IP 0
+#endif
+
+#ifndef WIFI_STATIC_IP_ADDR
+#define WIFI_STATIC_IP_ADDR 192, 168, 0, 50
+#endif
+
+#ifndef WIFI_GATEWAY_ADDR
+#define WIFI_GATEWAY_ADDR 192, 168, 0, 1
+#endif
+
+#ifndef WIFI_SUBNET_MASK
+#define WIFI_SUBNET_MASK 255, 255, 255, 0
+#endif
+
+#ifndef WIFI_PRIMARY_DNS_ADDR
+#define WIFI_PRIMARY_DNS_ADDR 192, 168, 0, 1
+#endif
+
+#ifndef WIFI_SECONDARY_DNS_ADDR
+#define WIFI_SECONDARY_DNS_ADDR 8, 8, 8, 8
+#endif
+
+#ifndef HA_USE_INTERNAL_BASE_URL
+#define HA_USE_INTERNAL_BASE_URL 0
+#endif
+
+#ifndef HA_INTERNAL_BASE_URL
+#define HA_INTERNAL_BASE_URL ""
+#endif
+
 // 디스플레이 해상도
 #define EPD_WIDTH 800
 #define EPD_HEIGHT 480
@@ -16,6 +48,8 @@
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 9 * 3600; // 한국 표준시 (UTC+9)
 const int   daylightOffset_sec = 0;
+const uint32_t wifiConnectTimeoutMs = 15000;
+const uint32_t fallbackSleepSeconds = 15 * 60;
 
 // 이미지 버퍼
 UBYTE *BlackImage;
@@ -29,6 +63,10 @@ void drawCalendar(struct tm *timeinfo, DynamicJsonDocument *doc);
 void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc);
 void drawEventsForDay(int year, int month, int day, int x, int y, int w, int h, DynamicJsonDocument *doc);
 uint32_t computeEventsHash(DynamicJsonDocument *doc);
+void shutdownWiFi();
+void enterDeepSleepForSeconds(uint32_t seconds);
+const char* getHaBaseUrl();
+bool beginHaRequest(HTTPClient &http, WiFiClient &plainClient, WiFiClientSecure &secureClient, const String &url);
 
 void setup() {
   Serial.begin(115200);
@@ -37,18 +75,46 @@ void setup() {
   DEV_Module_Init();
 
   // WiFi 연결
+  WiFi.mode(WIFI_STA);
+#if WIFI_USE_STATIC_IP
+  IPAddress localIP(WIFI_STATIC_IP_ADDR);
+  IPAddress gateway(WIFI_GATEWAY_ADDR);
+  IPAddress subnet(WIFI_SUBNET_MASK);
+  IPAddress primaryDNS(WIFI_PRIMARY_DNS_ADDR);
+  IPAddress secondaryDNS(WIFI_SECONDARY_DNS_ADDR);
+
+  if (WiFi.config(localIP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.print("Static IP configured: ");
+    Serial.println(localIP);
+  } else {
+    Serial.println("Failed to configure static IP. Falling back to DHCP.");
+  }
+#endif
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  uint32_t wifiConnectStart = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - wifiConnectStart) < wifiConnectTimeoutMs) {
     delay(500);
     Serial.print(".");
   }
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println(" WiFi connect timeout");
+    shutdownWiFi();
+    enterDeepSleepForSeconds(fallbackSleepSeconds);
+    return;
+  }
   Serial.println(" CONNECTED");
+  Serial.print("WiFi IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("HA Base URL: ");
+  Serial.println(getHaBaseUrl());
 
   // 시간 초기화 및 동기화
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   struct tm timeinfo;
   if(!getLocalTime(&timeinfo)){
     Serial.println("Failed to obtain time");
+    shutdownWiFi();
+    enterDeepSleepForSeconds(fallbackSleepSeconds);
     return;
   }
   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
@@ -69,6 +135,7 @@ void setup() {
   // 이벤트(일정) 조회
   DynamicJsonDocument *doc = new DynamicJsonDocument(65536);
   fetchEvents(year, month, daysInMonth, doc);
+  shutdownWiFi();
   
   // 데이터 해시 계산 (변경 감지용)
   uint32_t currentHash = computeEventsHash(doc);
@@ -104,7 +171,6 @@ void setup() {
 
       // 화면 출력
       EPD_7IN5_V2_Display(BlackImage);
-      DEV_Delay_ms(2000);
 
       // 디스플레이 절전
       printf("Goto Sleep...\r\n");
@@ -126,28 +192,60 @@ void setup() {
   long sleepSeconds = (60 - timeinfo.tm_min) * 60 - timeinfo.tm_sec;
   if (sleepSeconds <= 0) sleepSeconds = 3600; // Safety fallback
 
-  uint64_t sleepTime = (uint64_t)sleepSeconds * 1000000ULL;
-  esp_sleep_enable_timer_wakeup(sleepTime);
-  Serial.printf("Entering Deep Sleep for %ld seconds...\r\n", sleepSeconds);
-  esp_deep_sleep_start();
+  enterDeepSleepForSeconds((uint32_t)sleepSeconds);
 }
 
 void loop() {
   // This will not be reached due to deep sleep
 }
 
+void shutdownWiFi() {
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+}
+
+void enterDeepSleepForSeconds(uint32_t seconds) {
+  if (seconds == 0) seconds = 1;
+  uint64_t sleepTime = (uint64_t)seconds * 1000000ULL;
+  esp_sleep_enable_timer_wakeup(sleepTime);
+  Serial.printf("Entering Deep Sleep for %lu seconds...\r\n", (unsigned long)seconds);
+  Serial.flush();
+  esp_deep_sleep_start();
+}
+
+const char* getHaBaseUrl() {
+#if HA_USE_INTERNAL_BASE_URL
+  static const char* internalBaseUrl = HA_INTERNAL_BASE_URL;
+  if (internalBaseUrl[0] != '\0') {
+    return internalBaseUrl;
+  }
+#endif
+  return ha_base_url;
+}
+
+bool beginHaRequest(HTTPClient &http, WiFiClient &plainClient, WiFiClientSecure &secureClient, const String &url) {
+  if (url.startsWith("https://")) {
+    secureClient.setInsecure();
+    return http.begin(secureClient, url);
+  }
+  return http.begin(plainClient, url);
+}
+
 void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc) {
   if (WiFi.status() != WL_CONNECTED) return;
 
+  WiFiClient plainClient;
   WiFiClientSecure client;
-  client.setInsecure(); // SSL 검증 건너뛰기
   HTTPClient http;
 
   // 1. 캘린더 목록 조회
-  String listUrl = String(ha_base_url) + "/api/calendars";
+  String listUrl = String(getHaBaseUrl()) + "/api/calendars";
   Serial.println("Fetching Calendars List: " + listUrl);
   
-  http.begin(client, listUrl);
+  if (!beginHaRequest(http, plainClient, client, listUrl)) {
+    Serial.println("Failed to initialize calendars list request");
+    return;
+  }
   http.addHeader("Authorization", String("Bearer ") + ha_token);
   http.addHeader("Content-Type", "application/json");
   
@@ -179,7 +277,7 @@ void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc)
       const char* entity_id = cal["entity_id"];
       if (!entity_id) continue;
 
-      String eventsUrl = String(ha_base_url) + "/api/calendars/" + entity_id;
+      String eventsUrl = String(getHaBaseUrl()) + "/api/calendars/" + entity_id;
       char query[128];
       sprintf(query, "?start=%04d-%02d-01T00:00:00&end=%04d-%02d-%02dT23:59:59", year, month, year, month, daysInMonth);
       eventsUrl += query;
@@ -188,7 +286,10 @@ void fetchEvents(int year, int month, int daysInMonth, DynamicJsonDocument *doc)
       Serial.println(entity_id);
       Serial.println(eventsUrl);
       
-      http.begin(client, eventsUrl);
+      if (!beginHaRequest(http, plainClient, client, eventsUrl)) {
+          Serial.println("  Failed to initialize events request");
+          continue;
+      }
       http.addHeader("Authorization", String("Bearer ") + ha_token);
       http.addHeader("Content-Type", "application/json");
       

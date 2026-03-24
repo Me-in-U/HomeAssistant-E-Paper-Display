@@ -55,8 +55,29 @@ const char* password = "YOUR_WIFI_PASSWORD";
 const char* ha_base_url = "http://your-homeassistant-ip:8123";
 const char* ha_token = "YOUR_LONG_LIVED_ACCESS_TOKEN";
 
+// 선택 사항: Static IP 사용
+// 대부분 환경에서는 아래 2개만 있으면 됩니다.
+#define WIFI_USE_STATIC_IP 1
+#define WIFI_STATIC_IP_ADDR 192, 168, 0, 50
+
+// 아래는 공유기 기본 주소가 192.168.0.1이 아니거나
+// 서브넷/DNS를 직접 바꿔야 할 때만 추가하세요.
+#define WIFI_GATEWAY_ADDR 192, 168, 0, 1
+#define WIFI_SUBNET_MASK 255, 255, 255, 0
+#define WIFI_PRIMARY_DNS_ADDR 192, 168, 0, 1
+#define WIFI_SECONDARY_DNS_ADDR 8, 8, 8, 8
+
+// 선택 사항: 내부망 URL 사용
+// 기본값은 0이며, 1로 바꾸면 아래 주소를 사용합니다.
+#define HA_USE_INTERNAL_BASE_URL 1
+#define HA_INTERNAL_BASE_URL "http://192.168.0.10:8123"
+
 #endif
 ```
+
+`WIFI_USE_STATIC_IP`를 정의하지 않거나 `0`으로 두면 기존처럼 DHCP를 사용합니다.
+기본값은 `gateway=192.168.0.1`, `subnet=255.255.255.0`, `DNS=192.168.0.1/8.8.8.8`입니다.
+`HA_USE_INTERNAL_BASE_URL`를 정의하지 않거나 `0`으로 두면 기존 `ha_base_url`을 사용합니다.
 
 ### 2. 라이브러리 의존성
 
