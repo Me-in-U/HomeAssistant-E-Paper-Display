@@ -4,3 +4,5 @@ secrets.h
 # IDE specific files
 .vscode/
 .idea/
+E-Paper_ESP32_Driver_Board_Code/ePape_Esp32_Loader_APP/.project
+/E-Paper_ESP32_Driver_Board_Code
